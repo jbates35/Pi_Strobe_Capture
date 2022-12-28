@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.3.32819.101
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{803FD0C6-D64E-4E16-9DC3-1DAEC859A3D2}") = "pi_cam_test_1", "pi_cam_test_1.vgdbcmake", "{2AA0F6CB-858A-42B7-A8F0-21850FE6EC16}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|VisualGDB = Debug|VisualGDB
+		MinSizeRel|VisualGDB = MinSizeRel|VisualGDB
+		Release|VisualGDB = Release|VisualGDB
+		RelWithDebInfo|VisualGDB = RelWithDebInfo|VisualGDB
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2AA0F6CB-858A-42B7-A8F0-21850FE6EC16}.Debug|VisualGDB.ActiveCfg = Debug|VisualGDB
+		{2AA0F6CB-858A-42B7-A8F0-21850FE6EC16}.Debug|VisualGDB.Build.0 = Debug|VisualGDB
+		{2AA0F6CB-858A-42B7-A8F0-21850FE6EC16}.MinSizeRel|VisualGDB.ActiveCfg = MinSizeRel|VisualGDB
+		{2AA0F6CB-858A-42B7-A8F0-21850FE6EC16}.MinSizeRel|VisualGDB.Build.0 = MinSizeRel|VisualGDB
+		{2AA0F6CB-858A-42B7-A8F0-21850FE6EC16}.Release|VisualGDB.ActiveCfg = Release|VisualGDB
+		{2AA0F6CB-858A-42B7-A8F0-21850FE6EC16}.Release|VisualGDB.Build.0 = Release|VisualGDB
+		{2AA0F6CB-858A-42B7-A8F0-21850FE6EC16}.RelWithDebInfo|VisualGDB.ActiveCfg = RelWithDebInfo|VisualGDB
+		{2AA0F6CB-858A-42B7-A8F0-21850FE6EC16}.RelWithDebInfo|VisualGDB.Build.0 = RelWithDebInfo|VisualGDB
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {19EAC89A-C43F-4E6A-8685-B90BC7534BDB}
+	EndGlobalSection
+EndGlobal
