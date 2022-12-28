@@ -28,30 +28,14 @@ int FishTestCamera::init()
 		return -1;
 	}
 	
-	//Set up video stream
-	_camera.open(0);
+	//Open video and set height/width
+	_init_cam();
 	
-	//Set video stream width/height
-	_camera.set(cv::CAP_PROP_FRAME_WIDTH, _camera_size.width);
-	_camera.set(cv::CAP_PROP_FRAME_HEIGHT, _camera_size.height);
-	
-	//Create unique timestamp for folder
-	stringstream timestamp;
-	
-	//First, create struct which contains time values
-	time_t now = time(0);
-	tm *ltm = localtime(&now);
-	
-	//Store stringstream with numbers	
-	timestamp << 1900 + ltm->tm_year << "_";
-	timestamp << 1 + ltm->tm_mon << "_";
-	timestamp << ltm->tm_mday << "_";
-	timestamp << ltm->tm_hour << "h";
-	timestamp << ltm->tm_min << "m";
-	timestamp << ltm->tm_sec << "s";
+	//Get current time for folder
+	string current_time = _get_time();
 	
 	//Create base file path to build other folders from
-	_file_path_base = "./" + timestamp.str() + "/data/";
+	_file_path_base = "./" + current_time + "/data/";
 
 	//Path for video and picture files and create directories
 	_file_path_video = _file_path_base + "video/";
@@ -151,6 +135,10 @@ void FishTestCamera::run()
 	//State machine for camera
 	switch (_camera_state)
 	{
+	case CAMERA_OFF:
+		_camera_off();
+		break;
+		
 	case CAMERA_PICTURE:
 		_record_pictures();
 		break;
@@ -194,25 +182,55 @@ void FishTestCamera::set_button_2()
 }
 
 
+//Turn flash on, take picture, turn flash off, take picture, save files
+void FishTestCamera::_camera_off()
+{
+	//Make sure camera is running
+	if (_camera.isOpened() == false)
+	{
+		return;
+	}
+	
+	//Load camera to frame
+	_camera.read(_image);
+	
+	//Show camera for preview
+	cv::imshow("Preview camera", _image);
+	cv::waitKey(10);
+}
+
+//Records video, once flag has been turned off, save file
 void FishTestCamera::_record_video()
 {
 }
 
-
+//When camera is done, save video stream to file
 void FishTestCamera::_save_video()
 {
 }
 
-
+//Turn flash on, take picture, turn flash off, take picture, save files
 void FishTestCamera::_record_pictures()
 {
 	//Record current directory for creating and then saving pics to
 	string curr_file_path = _file_path_picture + to_string(_picture_count) + "/";
 	
-	//Take picture with flash on and save
+	//Take picture with flash off and save
 	if (_picture_state == 0)
 	{
-		//Make directory first
+		//Release camera if need be
+		if (_camera.isOpened() == true)
+		{
+			_camera.release();	
+		}
+		
+		//Open camera
+		_camera.open(0);
+		
+		//Clear stringstream for taking in file data
+		_file_info_ss.str("");
+		
+		//Make directory
 		string make_dir_command = "mkdir -p " + curr_file_path;
 		
 		//Make C version of string so unix can use
@@ -229,52 +247,65 @@ void FishTestCamera::_record_pictures()
 		//Make directory
 		system(make_dir_command_char);
 		
-		//Turn LEDs on
-		gpioWrite(_flash_leds_pin, 1);
-		
 		//Sleep 1ms
-		gpioSleep(PI_TIME_RELATIVE, 0, 5000);
-				
+		gpioSleep(PI_TIME_RELATIVE, 0, 1000);
+		
 		//Take picture and save
 		if (_camera.read(_image)) 
 		{			
-			cv::imwrite(curr_file_path + to_string(_picture_count) + "_flash_on.jpg", _image);
-						
-			std::cout << "Image: " << _picture_count << "_flash_on.jpg successfully saved to " << curr_file_path << "\n";
+			cv::imwrite(curr_file_path + to_string(_picture_count) + "_flash_off.jpg", _image);		
+			
+			_file_info_ss << "Image: " << _picture_count << "_flash_off.jpg successfully saved to " << curr_file_path << " at " << _get_time() << "\n";		
 		}
 		else
 		{
-			std::cout << "Error: Image: " << _picture_count << "_flash_on.jpg could not be saved to " << curr_file_path << "\n";
+			_file_info_ss << "Error: Image: " << _picture_count << "_flash_off.jpg could not be saved to " << curr_file_path << " at " << _get_time() << "\n";
 		}
 		
 		//Advance state machine
 		_picture_state++;
+		
+		//Turn LEDs on
+		gpioWrite(_flash_leds_pin, 1);
 		
 		//Reset picture timer
 		_picture_timer = cv::getTickCount();
 		
 	}
 	
-	//Take picture with flash off and save
-	if (_picture_state == 1 && (cv::getTickCount() - _picture_timer) / cv::getTickFrequency() >= STROBE_INT)
-	{		
-		//Turn LEDs off
-		gpioWrite(_flash_leds_pin, 0);
-		
+	//Take picture with flash on and save
+	if (_picture_state == 1)
+	{				
 		//Sleep 1ms
-		gpioSleep(PI_TIME_RELATIVE, 0, 5000);
+		gpioSleep(PI_TIME_RELATIVE, 0, 1000);
+		
+		//Add time for buffering
+		for (int capture_count = 0; capture_count < 1; capture_count++)
+		{
+			_camera.read(_image);		
+			
+			//Sleep 1ms
+			gpioSleep(PI_TIME_RELATIVE, 0, 1000);
+		}
 		
 		//Take picture and save
 		if (_camera.read(_image)) 
 		{			
-			cv::imwrite(curr_file_path + to_string(_picture_count) + "_flash_off.jpg", _image);
+			cv::imwrite(curr_file_path + to_string(_picture_count) + "_flash_on.jpg", _image);
 			
-			std::cout << "Image: " << _picture_count << "_flash_off.jpg successfully saved to " << curr_file_path << "\n";
+			_file_info_ss << "Image: " << _picture_count << "_flash_on.jpg successfully saved to " << curr_file_path << " at " << _get_time() << "\n";		
 		}
 		else
 		{
-			std::cout << "Error: Image: " << _picture_count << "_flash_off.jpg could not be saved to " << curr_file_path << "\n";
+			_file_info_ss << "Error: Image: " << _picture_count << "_flash_on.jpg could not be saved to " << curr_file_path << " at " << _get_time() << "\n";
 		}
+		
+		//Write time it between shots
+		_file_info_ss << "Time distance between camera shots: " <<  (cv::getTickCount() - _picture_timer) / cv::getTickFrequency() << "\n\n";
+		
+		//Write it to display, and save it to file as well
+		std::cout << _file_info_ss.str();
+		_write_file(_file_info_ss.str(), curr_file_path + to_string(_picture_count) + "_log.txt");
 		
 		//Change permission on all to 777
 		system("chmod -R 777 ./");
@@ -285,5 +316,63 @@ void FishTestCamera::_record_pictures()
 		
 		//Increment video count
 		_picture_count++;
+		
+		//Turn LEDs off
+		gpioWrite(_flash_leds_pin, 0);
+		
+		//Release camera
+		_camera.release();	
+		
+		//Re-initializes camera
+		_init_cam();		
 	}
+}
+
+//Makes sure camera is initialized/turned on, sets width/height
+void FishTestCamera::_init_cam()
+{
+	//Set up video stream
+	if (_camera.isOpened() == false)
+	{
+		_camera.open(0);	
+	}
+	
+	//Set video stream width/height
+	_camera.set(cv::CAP_PROP_FRAME_WIDTH, _camera_size.width);
+	_camera.set(cv::CAP_PROP_FRAME_HEIGHT, _camera_size.height);
+}
+
+
+string FishTestCamera::_get_time()
+{		
+	//Create unique timestamp for folder
+	stringstream timestamp;
+	
+	//First, create struct which contains time values
+	time_t now = time(0);
+	tm *ltm = localtime(&now);
+	
+	//Store stringstream with numbers	
+	timestamp << 1900 + ltm->tm_year << "_";
+	timestamp << 1 + ltm->tm_mon << "_";
+	timestamp << ltm->tm_mday << "_";
+	timestamp << ltm->tm_hour << "h";
+	timestamp << ltm->tm_min << "m";
+	timestamp << ltm->tm_sec << "s";
+	
+	//Return string version of ss
+	return timestamp.str();
+}
+
+//Write to a file holding log info in the specified folder
+void FishTestCamera::_write_file(string input, string path)
+{
+	//Create log file
+	std::ofstream out_file(path);
+	
+	//Write to file
+	out_file << input;
+	
+	//Close file
+	out_file.close();
 }

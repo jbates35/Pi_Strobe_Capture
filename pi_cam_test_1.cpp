@@ -28,7 +28,6 @@
 FishTestCamera cam(FLASH_LEDS_PIN, VIDEO_LED_PIN, SUCCESS_LED_PIN, BUTTON_1_PIN, BUTTON_2_PIN);
 	
 //////////FUNCTION PROTOTYPES///////////
-
 //Initializes button ISRs
 void init();
 
@@ -42,13 +41,14 @@ void button_2_isr(int gpio, int level, uint32_t tick);
 int main()
 {
 
-	//Initailize variables, pins, etc.
+	//Initialize variables, pins, etc.
 	if (cam.init() < 0)
 	{
 		std::cout << "Initialize unsuccessful";
 		return -1;
 	}
 	
+	//Initializes buttons
 	init();
 	
 	//Continuous program loop
@@ -75,7 +75,7 @@ void init()
 	gpioSetISRFunc(BUTTON_2_PIN, FALLING_EDGE, ISR_TIMEOUT, button_2_isr);
 }
 
-
+//Button 1 ISR - Debounces, invokes camera ISR 1 when pressed
 void button_1_isr(int gpio, int level, uint32_t tick)
 {
 	gpioSleep(PI_TIME_RELATIVE, 0, DEBOUNCE_INTERVAL);	
@@ -86,7 +86,7 @@ void button_1_isr(int gpio, int level, uint32_t tick)
 	}
 }
 
-
+//Button 2 ISR - Debounces, invokes camera ISR 2 when pressed
 void button_2_isr(int gpio, int level, uint32_t tick)
 {
 	gpioSleep(PI_TIME_RELATIVE, 0, DEBOUNCE_INTERVAL);	

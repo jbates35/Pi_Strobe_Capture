@@ -6,6 +6,7 @@
 #include <ctime>
 #include <sstream>
 #include <cstdlib>
+#include <fstream>
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgcodecs.hpp>
@@ -19,7 +20,7 @@ namespace fs = std::filesystem;
 
 #define VID_BUTTON_INTERVAL 1 // Amount of time to hold video toggle button
 
-#define STROBE_INT 0.05 //Length of interval between LEDs turning on, and off (in s)
+#define STROBE_INT 0.05  //Length of interval between LEDs turning on, and off (in s)
 
 //State of class, either taking a picture or running a video
 enum
@@ -70,8 +71,7 @@ public:
 	
 	
 private:
-	/******	MEMBER VARIABLES ******/
-	
+	/******	MEMBER VARIABLES ******/	
 	//OpenCV Video stream
 	cv::VideoCapture _camera;
 	cv::Size _camera_size;
@@ -108,6 +108,9 @@ private:
 	string _file_path_video;
 	string _file_path_picture;
 		
+	//Information about picture and/or video
+	stringstream _file_info_ss;
+		
 	//Timer between pictures - When button gets pressed, two pictures need to be taken
 	double _picture_timer;
 	
@@ -120,7 +123,10 @@ private:
 	//Turns on if picture or video has been saved correctly, and then starts function in run
 	bool _success_signal;
 	
+	
 	/******	METHODS ******/	
+	//Need preview camera, but camera isn't recording or taking picture in this state
+	void _camera_off();
 	
 	//Records video, once flag has been turned off, save file
 	void _record_video();
@@ -130,4 +136,13 @@ private:
 	
 	//Turn flash on, take picture, turn flash off, take picture, save files
 	void _record_pictures();
+	
+	//Makes sure camera is initialized/turned on, sets width/height
+	void _init_cam();
+	
+	//Fills the time buffer with current time
+	string _get_time();
+	
+	//Write to a file holding log info in the specified folder
+	void _write_file(string input, string path);	
 };
