@@ -5,6 +5,7 @@ cmake_minimum_required(VERSION 2.7)
 project(pi_cam_test_1)
 set(LIBRARIES_FROM_REFERENCES "")
 add_executable(pi_cam_test_1 pi_cam_test_1.cpp FishTestCamera.cpp)
+set_property(TARGET pi_cam_test_1 PROPERTY CXX_STANDARD 17)
 find_package(OpenCV REQUIRED)
 
 # Find the path to the pigpio includes.
