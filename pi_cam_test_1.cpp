@@ -16,6 +16,7 @@
 #include "FishTestCamera.h"
 
 #define BUTTON_1_PIN	19 // pin for button
+#define BUTTON_2_PIN	13 // pin for button
 #define LED_PIN			26 // pin for led
 
 #define ISR_TIMEOUT		100000 // microseconds
@@ -31,9 +32,8 @@ int init();
 //ISR for Button 1
 void button_1_isr(int gpio, int level, uint32_t tick);
 
-//
-void camera_shot();
-
+//ISR for Button 2
+void button_2_isr(int gpio, int level, uint32_t tick);
 
 
 /*******	FUNCTION DEFINTIONS		*******/
@@ -71,6 +71,13 @@ int init()
 	
 	//Setup ISR with Button 1 
 	gpioSetISRFunc(BUTTON_1_PIN, FALLING_EDGE, ISR_TIMEOUT, button_1_isr);	
+
+	//Button 2 setup
+	gpioSetMode(BUTTON_2_PIN, PI_INPUT);
+	gpioSetPullUpDown(BUTTON_2_PIN, PI_PUD_UP);
+	
+	//Setup ISR with Button 2 
+	gpioSetISRFunc(BUTTON_2_PIN, FALLING_EDGE, ISR_TIMEOUT, button_2_isr);	
 	
 	return 0;
 }
@@ -79,9 +86,42 @@ int init()
 void button_1_isr(int gpio, int level, uint32_t tick)
 {	
 	//Test counter
+	static bool button_pressed_1 = false;
+	static double press_time_1 = cv::getTickCount();
+
+	//If button is in debounce interval, return and do nothing
+	if (button_pressed_1 == true && (cv::getTickCount() - press_time_1) / cv::getTickFrequency() < DEBOUNCE_INTERVAL)
+	{
+		return;
+	}
+	
+	//If button is pressed, make true and start timer
+	if (button_pressed_1 == false) 
+	{
+		button_pressed_1 = true;
+		
+		//Start timer
+		press_time_1 = cv::getTickCount();
+		
+		return;
+	}
+	
+	//If debounce successful, run actual function
+	if (button_pressed_1 == true && (cv::getTickCount() - press_time_1) / cv::getTickFrequency() >= DEBOUNCE_INTERVAL)
+	{
+		button_pressed_1 = false;
+		
+		//ACTUAL ISR METHOD HERE
+		
+	}	
+}
+
+//Set ISR for button 2
+void button_2_isr(int gpio, int level, uint32_t tick)
+{	
+	//Test counter
 	static bool button_pressed = false;
 	static double press_time = cv::getTickCount();
-	static bool led_state=false;
 
 	//If button is in debounce interval, return and do nothing
 	if (button_pressed == true && (cv::getTickCount() - press_time) / cv::getTickFrequency() < DEBOUNCE_INTERVAL)
@@ -105,8 +145,7 @@ void button_1_isr(int gpio, int level, uint32_t tick)
 	{
 		button_pressed = false;
 		
-		led_state = !led_state;
+		//ACTUAL ISR METHOD HERE
 		
-		gpioWrite(LED_PIN, !gpioRead(LED_PIN));
 	}	
 }
