@@ -109,36 +109,9 @@ int FishTestCamera::init()
 	return 0;
 }
 
-
+//Continuous loop - takes care of organizing camera state machine and running script
 void FishTestCamera::run()
 {
-	//If button 2 has been pressed, turn second debounce on
-	if (_button_2_pressed == 1 && (cv::getTickCount() - _button_2_timer) / cv::getTickFrequency() >= VID_BUTTON_INTERVAL)
-	{
-		//Make sure button is pressed still (after 2 seconds)
-		if (gpioRead(_button_2_pin) == false)
-		{	
-			//If camera state machine is off, can turn video mode on
-			if (_camera_state == CAMERA_OFF)
-			{
-				//Set camera state
-				_camera_state = CAMERA_VIDEO;
-				
-				//Set video state to 'record'
-				_video_state = VIDEO_RECORD;
-			}
-			
-			//If camera state machine is video, can then invoke saving file
-			if (_camera_state == CAMERA_VIDEO)
-			{
-				//Change video state to tell script to end file, save it, etc.
-				_video_state = VIDEO_DONE;
-			}
-		}
-		
-		_button_2_pressed = 0;
-	}
-	
 	//State machine for camera
 	switch (_camera_state)
 	{
@@ -156,8 +129,7 @@ void FishTestCamera::run()
 		
 	default:
 		break;
-	}
-	
+	}	
 }
 
 //ISR for button 1 - turn picture mode on
@@ -176,12 +148,27 @@ void FishTestCamera::set_button_1()
 
 //ISR for button 2 - starts timer for run thread to see if button is pressed for 2 seconds
 void FishTestCamera::set_button_2()
-{
-	//Start timer
-	_button_2_timer = cv::getTickCount();
-	
-	//Turn button on 
-	_button_2_pressed = 1;
+{	
+	//If camera state machine is video, can then invoke saving file
+	if (_camera_state == CAMERA_VIDEO)
+	{
+		std::cout << "Button 2 registered, turning video off\n";
+				
+		//Change video state to tell script to end file, save it, etc.
+		_video_state = VIDEO_DONE;
+	}
+			
+	//If camera state machine is off, can turn video mode on
+	else if (_camera_state == CAMERA_OFF)
+	{
+		std::cout << "Button 2 registered, turning video on\n";
+				
+		//Set camera state
+		_camera_state = CAMERA_VIDEO;
+				
+		//Set video state to 'record'
+		_video_state = VIDEO_RECORD;
+	}	
 }
 
 
@@ -191,8 +178,17 @@ void FishTestCamera::_camera_off()
 	//Make sure camera is running
 	if (_camera.isOpened() == false)
 	{
-		return;
+		//Initiailize camera if need be
+		_init_cam();
+		
+		if (_camera.isOpened() == false)
+		{
+			return;
+		}
 	}
+	
+	//Make sure cam can be run
+	gpioSleep(PI_TIME_RELATIVE, 0, 5000);
 	
 	//Load camera to frame
 	_camera.read(_image);
@@ -263,6 +259,9 @@ void FishTestCamera::_record_video()
 			
 			return;
 		}
+		
+		//Log start of video
+		std::cout << "Writing video " << _video_count << ".avi...\n";		
 	}
 		
 	//Record video and show frames
@@ -283,14 +282,25 @@ void FishTestCamera::_record_video()
 			break;
 		}
 		
+		//Capture frame
+		_video.write(_image);	
+		
+		//Draw red rectangle around frame, also say recording
+		cv::rectangle(_image, cv::Point(1, 1), cv::Point(_image.size().width - 1, _image.size().height - 1), cv::Scalar(0, 0, 255), 3);
+		cv::putText(_image, "Recording", cv::Point(20, 20), cv::QT_FONT_BLACK, 0.75, cv::Scalar(0, 0, 255), 1);
+		
+		//Show live while recording
+		cv::imshow("Preview camera", _image);
+		cv::waitKey(5);		
+		
 		//Increment frame count, get time, write to log
 		_frame_count++;
-		_file_info_ss << "Frame " << _frame_count << " time: " << round(1000*(cv::getTickCount() - _frame_timer) / cv::getTickFrequency()) << "ms \n";
-		
-		
+		_file_info_ss << "Frame " << _frame_count << " time: " << round(1000*(cv::getTickCount() - _frame_timer) / cv::getTickFrequency()) << "ms \n";		
 	}
 		
 	//Save video file to file
+	_video.release();
+	_camera.release();
 	
 	//Write remaining file info
 	_file_info_ss << "File " << _video_count << ".avi successfully saved to " << _file_path_video << "\n";
@@ -301,20 +311,16 @@ void FishTestCamera::_record_video()
 	gpioWrite(_video_led_pin, 0);	
 		
 	//Reset camera state
-	_camera_state = CAMERA_OFF;
+	_camera_state = CAMERA_OFF;	
+	
+	//Reset video state
+	_video_state = VIDEO_RECORD;
 		
 	//Increment video count
 	_video_count++;
 		
 	//Write to log file
 	_write_file(_file_info_ss.str(), _file_path_video + to_string(_video_count) + "_log.txt");
-	
-	//Reset video state
-	_video_state = VIDEO_RECORD;
-
-	//Show camera for preview
-	cv::imshow("Preview camera", _image);
-	cv::waitKey(10);	
 }
 
 //Turn flash on, take picture, turn flash off, take picture, save files

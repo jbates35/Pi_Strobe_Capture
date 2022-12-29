@@ -22,8 +22,11 @@
 #define VIDEO_LED_PIN	20 // pin for flashing led
 #define SUCCESS_LED_PIN	21 // pin for flashing led
 	
-#define DEBOUNCE_INTERVAL 10000 // microseconds
-	
+#define DEBOUNCE_INTERVAL			10000	// microseconds
+#define DEBOUNCE_INTERVAL_VID_S		1		//seconds
+#define DEBOUNCE_INTERVAL_VID_US	250000	// microseconds
+
+
 //Holds camera object for taking picture, saving to file, doing some processing
 FishTestCamera cam(FLASH_LEDS_PIN, VIDEO_LED_PIN, SUCCESS_LED_PIN, BUTTON_1_PIN, BUTTON_2_PIN);
 	
@@ -89,7 +92,7 @@ void button_1_isr(int gpio, int level, uint32_t tick)
 //Button 2 ISR - Debounces, invokes camera ISR 2 when pressed
 void button_2_isr(int gpio, int level, uint32_t tick)
 {
-	gpioSleep(PI_TIME_RELATIVE, 0, DEBOUNCE_INTERVAL);	
+	gpioSleep(PI_TIME_RELATIVE, DEBOUNCE_INTERVAL_VID_S, DEBOUNCE_INTERVAL_VID_US);	
 	
 	if (gpioRead(BUTTON_2_PIN) == false)
 	{
