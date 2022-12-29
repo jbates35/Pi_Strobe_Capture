@@ -14,7 +14,6 @@
 #include <pigpio.h>
 
 using namespace std;
-namespace fs = std::filesystem;
 
 #define ISR_TIMEOUT		100000 // microseconds
 
@@ -27,8 +26,13 @@ enum
 {
 	CAMERA_OFF,
 	CAMERA_PICTURE,
-	CAMERA_VIDEO_ON,
-	CAMERA_VIDEO_DONE
+	CAMERA_VIDEO
+};
+
+enum
+{
+	VIDEO_RECORD,
+	VIDEO_DONE
 };
 
 class FishTestCamera
@@ -44,7 +48,7 @@ public:
 	 ** @param button_2_pin Input pin for button 2
 	 **	@param cam_size 
 	 ***/
-	FishTestCamera(int flash_leds_pin, int video_led_pin, int success_led_pin, int button_1_pin, int button_2_pin, cv::Size cam_size = cv::Size(960, 720));
+	FishTestCamera(int flash_leds_pin, int video_led_pin, int success_led_pin, int button_1_pin, int button_2_pin, cv::Size cam_size = cv::Size(640, 480));
 	~FishTestCamera();
 	
 	/**
@@ -79,6 +83,9 @@ private:
 	//OpenCV mat for video or pic
 	cv::Mat _image;
 	
+	//OpenCV video object for recording
+	cv::VideoWriter _video;
+		
 	//Pins for various LEDs
 	int _flash_leds_pin;
 	int _video_led_pin;
@@ -117,6 +124,16 @@ private:
 	//Two pictures need to be taken, keep track of which picture has been taken so far
 	int _picture_state;
 	
+	//Timer for how long video lasts
+	double _video_timer;
+	
+	//Need video state machine for whether it's starting, recording or if it's done
+	int _video_state;
+	
+	//Frame count and timer
+	int _frame_count;
+	double _frame_timer;
+	
 	//State of camera, refer to enums for states
 	int _camera_state;
 	
@@ -130,9 +147,6 @@ private:
 	
 	//Records video, once flag has been turned off, save file
 	void _record_video();
-	
-	//When camera is done, save video stream to file
-	void _save_video();
 	
 	//Turn flash on, take picture, turn flash off, take picture, save files
 	void _record_pictures();

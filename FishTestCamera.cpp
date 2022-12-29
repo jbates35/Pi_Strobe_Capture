@@ -93,6 +93,9 @@ int FishTestCamera::init()
 	_camera_state = CAMERA_OFF;
 	_picture_state = 0;
 	
+	//Initialize LED state
+	_led_state = false;
+	
 	//LED Pin setup
 	gpioSetMode(_flash_leds_pin, PI_OUTPUT);	
 	gpioSetMode(_video_led_pin, PI_OUTPUT);	
@@ -118,14 +121,18 @@ void FishTestCamera::run()
 			//If camera state machine is off, can turn video mode on
 			if (_camera_state == CAMERA_OFF)
 			{
-				_camera_state = CAMERA_VIDEO_ON;
+				//Set camera state
+				_camera_state = CAMERA_VIDEO;
 				
+				//Set video state to 'record'
+				_video_state = VIDEO_RECORD;
 			}
 			
 			//If camera state machine is video, can then invoke saving file
-			if (_camera_state == CAMERA_VIDEO_ON)
+			if (_camera_state == CAMERA_VIDEO)
 			{
-				_camera_state = CAMERA_VIDEO_DONE;
+				//Change video state to tell script to end file, save it, etc.
+				_video_state = VIDEO_DONE;
 			}
 		}
 		
@@ -143,12 +150,8 @@ void FishTestCamera::run()
 		_record_pictures();
 		break;
 		
-	case CAMERA_VIDEO_ON:
-		_camera_state = 0;
-		break;
-			
-	case CAMERA_VIDEO_DONE:
-		_camera_state = 0;
+	case CAMERA_VIDEO:
+		_record_video();
 		break;
 		
 	default:
@@ -202,11 +205,116 @@ void FishTestCamera::_camera_off()
 //Records video, once flag has been turned off, save file
 void FishTestCamera::_record_video()
 {
-}
+	//Clear file stream for logging
+	_file_info_ss.str("");
+	
+	//Reset timer
+	_video_timer = cv::getTickCount();
+	
+	//Make sure camera is running
+	if (_camera.isOpened() == false)
+	{
+		_init_cam();
+		
+		//Still no dice? Record log
+		if (_camera.isOpened() == false)
+		{
+			_file_info_ss << "Couldn't open video, must return";
+			
+			//Write to log file
+			_write_file(_file_info_ss.str(), _file_path_video + to_string(_video_count) + "_log.txt");
+			
+			return;
+		}
+	}
+		
+	//Initialize video
+	if (_video_state == 0)
+	{
+		//Turn blue LEDs on
+		gpioWrite(_video_led_pin, 1);		
+		
+		//Reset frame counter
+		_frame_count = 0;
+		
+		//Load camera to frame
+		_camera.read(_image);
+		
+		//Store parameters for video
+		string file_name = _file_path_video + to_string(_video_count) + ".avi";
+		int codec = cv::VideoWriter::fourcc('M', 'J', 'P', 'G');
+		double fps = 20.0;
+		bool is_color = (_image.type() == CV_8UC3);
+		
+		//Open video stream and record
+		_video.open(file_name, codec, fps, _image.size(), is_color);
+		
+		//Ensure video file is open
+		if (!_video.isOpened()) 
+		{
+			//Write error msg
+			_file_info_ss << "Could not open the output video file for write\n";
+			
+			//Turn blue LEDs off
+			gpioWrite(_video_led_pin, 0);
+			
+			//Write to log file
+			_write_file(_file_info_ss.str(), _file_path_video + to_string(_video_count) + "_log.txt");
+			
+			return;
+		}
+	}
+		
+	//Record video and show frames
+	while (_video_state == VIDEO_RECORD)
+	{
+		//Initialize timer for grabbing frame time
+		_frame_timer = cv::getTickCount();
+				
+		//Toggle led state and strobe lights
+		_led_state = !_led_state;
+		gpioWrite(_flash_leds_pin, _led_state);
+		
+		//Return if blank frame grabbed
+		if (!_camera.read(_image))
+		{
+			_file_info_ss << "WARNING: Grabbed blank frame, ending video...\n";
+			
+			break;
+		}
+		
+		//Increment frame count, get time, write to log
+		_frame_count++;
+		_file_info_ss << "Frame " << _frame_count << " time: " << round(1000*(cv::getTickCount() - _frame_timer) / cv::getTickFrequency()) << "ms \n";
+		
+		
+	}
+		
+	//Save video file to file
+	
+	//Write remaining file info
+	_file_info_ss << "File " << _video_count << ".avi successfully saved to " << _file_path_video << "\n";
+	_file_info_ss << "Length of video: " << (cv::getTickCount() - _video_timer) / cv::getTickFrequency() << "s\n";
+	_file_info_ss << "Date and time of video record: " << _get_time() << "\n\n";
+		
+	//Video is done recording, so can turn blue LEDs off
+	gpioWrite(_video_led_pin, 0);	
+		
+	//Reset camera state
+	_camera_state = CAMERA_OFF;
+		
+	//Increment video count
+	_video_count++;
+		
+	//Write to log file
+	_write_file(_file_info_ss.str(), _file_path_video + to_string(_video_count) + "_log.txt");
+	
+	//Reset video state
+	_video_state = VIDEO_RECORD;
 
-//When camera is done, save video stream to file
-void FishTestCamera::_save_video()
-{
+	//Show camera for preview
+	cv::imshow("Preview camera", _image);
+	cv::waitKey(10);	
 }
 
 //Turn flash on, take picture, turn flash off, take picture, save files
@@ -335,6 +443,7 @@ void FishTestCamera::_init_cam()
 	if (_camera.isOpened() == false)
 	{
 		_camera.open(0);	
+		gpioSleep(PI_TIME_RELATIVE, 0, 1000);
 	}
 	
 	//Set video stream width/height
@@ -354,10 +463,45 @@ string FishTestCamera::_get_time()
 	
 	//Store stringstream with numbers	
 	timestamp << 1900 + ltm->tm_year << "_";
+	
+	//Zero-pad month
+	if ((1 + ltm->tm_mon) < 10) 
+	{
+		timestamp << "0";
+	}
+	
 	timestamp << 1 + ltm->tm_mon << "_";
+	
+	//Zero-pad day
+	if ((1 + ltm->tm_mday) < 10) 
+	{
+		timestamp << "0";
+	}
+	
 	timestamp << ltm->tm_mday << "_";
+	
+	//Zero-pad hours
+	if (ltm->tm_hour < 10) 
+	{
+		timestamp << "0";
+	}
+	
 	timestamp << ltm->tm_hour << "h";
+	
+	//Zero-pad minutes
+	if (ltm->tm_min < 10) 
+	{
+		timestamp << "0";
+	}
+	
 	timestamp << ltm->tm_min << "m";
+	
+	//Zero-pad seconds
+	if (ltm->tm_sec < 10) 
+	{
+		timestamp << "0";
+	}
+	
 	timestamp << ltm->tm_sec << "s";
 	
 	//Return string version of ss
