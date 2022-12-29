@@ -1,5 +1,6 @@
 #pragma once
 
+#include <thread>
 #include <iostream>
 #include <vector>
 #include <string>
@@ -159,4 +160,13 @@ private:
 	
 	//Write to a file holding log info in the specified folder
 	void _write_file(string input, string path);	
+	
+	//If successful, flash the green LEDs
+	void _show_success();
+	
+	//Creates thread for _show_success
+	static void _show_success_thread(FishTestCamera* ptr);
+	
+	//Function invoked to actually start the thread
+	void _call_show_success();
 };

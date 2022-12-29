@@ -171,7 +171,6 @@ void FishTestCamera::set_button_2()
 	}	
 }
 
-
 //Turn flash on, take picture, turn flash off, take picture, save files
 void FishTestCamera::_camera_off()
 {
@@ -239,7 +238,7 @@ void FishTestCamera::_record_video()
 		//Store parameters for video
 		string file_name = _file_path_video + to_string(_video_count) + ".avi";
 		int codec = cv::VideoWriter::fourcc('M', 'J', 'P', 'G');
-		double fps = 20.0;
+		double fps = 12.0;
 		bool is_color = (_image.type() == CV_8UC3);
 		
 		//Open video stream and record
@@ -269,11 +268,7 @@ void FishTestCamera::_record_video()
 	{
 		//Initialize timer for grabbing frame time
 		_frame_timer = cv::getTickCount();
-				
-		//Toggle led state and strobe lights
-		_led_state = !_led_state;
-		gpioWrite(_flash_leds_pin, _led_state);
-		
+						
 		//Return if blank frame grabbed
 		if (!_camera.read(_image))
 		{
@@ -285,13 +280,17 @@ void FishTestCamera::_record_video()
 		//Capture frame
 		_video.write(_image);	
 		
+		//Toggle led state and strobe lights
+		_led_state = !_led_state;
+		gpioWrite(_flash_leds_pin, _led_state);
+		
 		//Draw red rectangle around frame, also say recording
 		cv::rectangle(_image, cv::Point(1, 1), cv::Point(_image.size().width - 1, _image.size().height - 1), cv::Scalar(0, 0, 255), 3);
 		cv::putText(_image, "Recording", cv::Point(20, 20), cv::QT_FONT_BLACK, 0.75, cv::Scalar(0, 0, 255), 1);
 		
 		//Show live while recording
 		cv::imshow("Preview camera", _image);
-		cv::waitKey(5);		
+		cv::waitKey(40);		
 		
 		//Increment frame count, get time, write to log
 		_frame_count++;
@@ -307,9 +306,19 @@ void FishTestCamera::_record_video()
 	_file_info_ss << "Length of video: " << (cv::getTickCount() - _video_timer) / cv::getTickFrequency() << "s\n";
 	_file_info_ss << "Date and time of video record: " << _get_time() << "\n\n";
 		
+	//Write to log file
+	_write_file(_file_info_ss.str(), _file_path_video + to_string(_video_count) + "_log.txt");
+	
 	//Video is done recording, so can turn blue LEDs off
 	gpioWrite(_video_led_pin, 0);	
 		
+	//Make sure flash LEDs are off
+	_led_state = 0;
+	gpioWrite(_flash_leds_pin, _led_state);
+	
+			//Turn success LEDs on (calls thread)
+		_call_show_success();
+	
 	//Reset camera state
 	_camera_state = CAMERA_OFF;	
 	
@@ -317,10 +326,7 @@ void FishTestCamera::_record_video()
 	_video_state = VIDEO_RECORD;
 		
 	//Increment video count
-	_video_count++;
-		
-	//Write to log file
-	_write_file(_file_info_ss.str(), _file_path_video + to_string(_video_count) + "_log.txt");
+	_video_count++;		
 }
 
 //Turn flash on, take picture, turn flash off, take picture, save files
@@ -433,6 +439,9 @@ void FishTestCamera::_record_pictures()
 		
 		//Turn LEDs off
 		gpioWrite(_flash_leds_pin, 0);
+				
+		//Turn success LEDs on (calls thread)
+		_call_show_success();
 		
 		//Release camera
 		_camera.release();	
@@ -525,4 +534,31 @@ void FishTestCamera::_write_file(string input, string path)
 	
 	//Close file
 	out_file.close();
+}
+
+//Flash green LED to show that video or picture has been successful
+void FishTestCamera::_show_success()
+{
+	//Flash thrice
+	gpioWrite(_success_led_pin, 1);
+	gpioSleep(PI_TIME_RELATIVE, 0, 500000);
+	gpioWrite(_success_led_pin, 0);
+	gpioSleep(PI_TIME_RELATIVE, 0, 500000);	
+	gpioWrite(_success_led_pin, 1);
+	gpioSleep(PI_TIME_RELATIVE, 0, 500000);
+	gpioWrite(_success_led_pin, 0);
+}
+
+//Start thread for show_success
+void FishTestCamera::_show_success_thread(FishTestCamera* ptr)
+{
+	ptr->_show_success();
+}
+
+//Function invoked to actually start the thread
+void FishTestCamera::_call_show_success()
+{
+	//Tell program it's success
+	thread t1(&FishTestCamera::_show_success_thread, this);
+	t1.detach();
 }

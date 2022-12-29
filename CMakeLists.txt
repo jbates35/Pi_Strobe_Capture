@@ -3,10 +3,11 @@
 
 cmake_minimum_required(VERSION 2.7)
 project(pi_cam_test_1)
-set(LIBRARIES_FROM_REFERENCES "")
+
 add_executable(pi_cam_test_1 pi_cam_test_1.cpp FishTestCamera.cpp)
-set_property(TARGET pi_cam_test_1 PROPERTY CXX_STANDARD 17)
+set_property(TARGET pi_cam_test_1 PROPERTY CXX_STANDARD 11)
 find_package(OpenCV REQUIRED)
+find_package(Threads)
 
 # Find the path to the pigpio includes.
 find_path(pigpio_INCLUDE_DIR 
@@ -28,6 +29,8 @@ find_library(pigpiod_if2_LIBRARY
 # the paramount cmake modules.
 set(pigpio_INCLUDE_DIRS ${pigpio_INCLUDE_DIR})
 set(pigpio_INCLUDES     ${pigpio_INCLUDE_DIR})
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 
 # Handle REQUIRED, QUIET, and version arguments 
 # and set the <packagename>_FOUND variable.
