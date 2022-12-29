@@ -3,10 +3,6 @@ For capstone - makes pi strobe light while taking pictures to capture fish eyes
 
 This is to gather data that we can start moving forward with creating algorithms for the fish counter.
 
-For reference, these are the camera settings when we need to use system("..."):
-
-![image](https://user-images.githubusercontent.com/70033294/210016663-51e129bb-d8be-4517-9fb9-a2b4929b460f.png)
-
 This program will open a camera stream on your Pi (or ssh'd with x11 forwarding client). It will look like this when first running:
 
 ![image](https://user-images.githubusercontent.com/70033294/210021653-9f86d6dd-57d8-4a27-b345-3ac56b5e82ec.png)
@@ -30,3 +26,7 @@ The video is simply a continual stream of camera shots where the flash is turned
 There is a log file that goes with each picture or video shot:
 
 ![image](https://user-images.githubusercontent.com/70033294/210021814-f5e504d2-c3e1-41d8-80f4-7e0837802275.png)
+
+For reference of anyone making changes to this program, (if more parameters need to be added or removed), these are the camera settings when we need to use system("..."):
+
+![image](https://user-images.githubusercontent.com/70033294/210016663-51e129bb-d8be-4517-9fb9-a2b4929b460f.png)
