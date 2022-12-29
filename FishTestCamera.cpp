@@ -330,6 +330,9 @@ void FishTestCamera::_record_video()
 	
 	//Write remaining file info
 	_file_info_ss << "Exposure of camera: " << _exposure << "\n";
+	_file_info_ss << "Brightness of camera: " << _brightness << "\n";
+	_file_info_ss << "Contrast of camera: " << _contrast << "\n";
+	_file_info_ss << "Saturation of camera: " << _saturation << "\n";
 	_file_info_ss << "Video frame period: " << _video_frame_period << "\n";
 	_file_info_ss << "File " << _video_count << ".avi successfully saved to " << _file_path_video << "\n";
 	_file_info_ss << "Length of video: " << (cv::getTickCount() - _video_timer) / cv::getTickFrequency() << "s\n";
@@ -455,6 +458,9 @@ void FishTestCamera::_record_pictures()
 		
 		//Write other camera parameters
 		_file_info_ss << "Exposure of camera: " << _exposure << "\n";
+		_file_info_ss << "Brightness of camera: " << _brightness << "\n";
+		_file_info_ss << "Contrast of camera: " << _contrast << "\n";
+		_file_info_ss << "Saturation of camera: " << _saturation << "\n";
 		
 		//Write it to display, and save it to file as well
 		std::cout << _file_info_ss.str();
