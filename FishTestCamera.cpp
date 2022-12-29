@@ -35,7 +35,7 @@ int FishTestCamera::init()
 	string current_time = _get_time();
 	
 	//Create base file path to build other folders from
-	_file_path_base = "./" + current_time + "/data/";
+	_file_path_base = "./data/" + current_time + "/";
 
 	//Path for video and picture files and create directories
 	_file_path_video = _file_path_base + "video/";
@@ -286,11 +286,13 @@ void FishTestCamera::_record_video()
 		
 		//Draw red rectangle around frame, also say recording
 		cv::rectangle(_image, cv::Point(1, 1), cv::Point(_image.size().width - 1, _image.size().height - 1), cv::Scalar(0, 0, 255), 3);
-		cv::putText(_image, "Recording", cv::Point(20, 20), cv::QT_FONT_BLACK, 0.75, cv::Scalar(0, 0, 255), 1);
+		cv::putText(_image, "Recording", cv::Point(20, 20), cv::FONT_HERSHEY_DUPLEX, 0.75, cv::Scalar(0, 0, 255), 1);
 		
 		//Show live while recording
 		cv::imshow("Preview camera", _image);
-		cv::waitKey(40);		
+		
+		//Delay so LED flash can be fully on or off in the shot (not in transition)
+		cv::waitKey(30);		
 		
 		//Increment frame count, get time, write to log
 		_frame_count++;

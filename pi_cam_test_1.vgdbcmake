@@ -121,7 +121,7 @@
   <ImportedPropertySheets />
   <CodeSense>
     <Enabled>True</Enabled>
-    <CXXFLAGS>-lpthread -pthread</CXXFLAGS>
+    <CXXFLAGS />
     <ExtraSettings>
       <HideErrorsInSystemHeaders>true</HideErrorsInSystemHeaders>
       <SupportLightweightReferenceAnalysis>true</SupportLightweightReferenceAnalysis>
