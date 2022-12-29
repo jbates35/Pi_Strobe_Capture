@@ -6,6 +6,7 @@ project(pi_cam_test_1)
 
 add_executable(pi_cam_test_1 pi_cam_test_1.cpp FishTestCamera.cpp)
 set_property(TARGET pi_cam_test_1 PROPERTY CXX_STANDARD 11)
+
 find_package(OpenCV REQUIRED)
 find_package(Threads)
 

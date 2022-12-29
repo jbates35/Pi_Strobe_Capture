@@ -13,13 +13,32 @@ FishTestCamera::FishTestCamera(int flash_leds_pin, int video_led_pin, int succes
 	//Store pins for Buttons
 	_button_1_pin = button_1_pin;
 	_button_2_pin = button_2_pin;	
+	
+	//Initialize trackbars for cvui
+	cvui::init(CANVAS_NAME);
 }
 
 FishTestCamera::~FishTestCamera()
 {
+	//Terminate GPIO
+	gpioTerminate();
+	
+	//End camera, release any video files
+	if (_video.isOpened())
+	{
+		_video.release();
+	}
+	
+	if (_camera.isOpened())
+	{
+		_camera.release();
+	}
+	
+	//Close any remaining windows
+	cv::destroyAllWindows();
 }
 
-
+//Initialize dynamic elements
 int FishTestCamera::init()
 {	
 	//Initialize GPIO and return as failure if unsuccessful
@@ -43,17 +62,9 @@ int FishTestCamera::init()
 	
 	//Make command for VIDEO directory and then convert it to char
 	string file_command = "mkdir -p " + _file_path_video;
-	char *file_command_char;
-	file_command_char = (char*) malloc(file_command.size() + 1);
-	
-	for (int char_ind = 0; char_ind < file_command.size(); char_ind++)
-	{
-		file_command_char[char_ind] = file_command[char_ind];
-	}
-	file_command_char[file_command.size()] = '\0';
-	
+		
 	//Make directory, return error if not possible
-	if (system(file_command_char) == -1)
+	if (system(file_command.c_str()) == -1)
 	{
 		std::cout << "Failed to make video directory, exiting program\n";
 		return -1;
@@ -61,29 +72,23 @@ int FishTestCamera::init()
 	
 	//Now make command for PICTURE directory and convert it to char
 	file_command = "mkdir -p " + _file_path_picture;
-	file_command_char = (char*) malloc(file_command.size() + 1);
-	
-	for (int char_ind = 0; char_ind < file_command.size(); char_ind++)
-	{
-		file_command_char[char_ind] = file_command[char_ind];
-	}
-	file_command_char[file_command.size()] = '\0';
 	
 	//Make directory, return error if not possible
-	if (system(file_command_char) == -1)
+	if (system(file_command.c_str()) == -1)
 	{
 		std::cout << "Failed to make picture directory, exiting program\n";
 		return -1;
 	}
-	
-	free(file_command_char);
-	
+		
 	//Now change the two directories to chmod +777	
 	if (system("chmod -R 777 ./") == -1)
 	{
 		std::cout << "Failed to change permissions, exiting program\n";
 		return -1;			
 	}
+	
+	//Set camera to manual exposure
+	system("v4l2-ctl --device /dev/video0 -c auto_exposure=1");	
 	
 	//Initialize pic and video count
 	_picture_count = 0;
@@ -93,8 +98,22 @@ int FishTestCamera::init()
 	_camera_state = CAMERA_OFF;
 	_picture_state = 0;
 	
+	//Default framerate for video
+	_video_frame_period = FRAME_PERIOD_DEFAULT;
+
+	//Initialize camera and cvui parameters
+	_exposure = EXPOSURE_DEFAULT;
+	_brightness = BRIGHTNESS_DEFAULT;
+	_contrast = CONTRAST_DEFAULT;
+	_saturation = SATURATION_DEFAULT;
+	_show_cvui = false;
+	
 	//Initialize LED state
 	_led_state = false;
+		
+	//Initialize quit and waitkeys
+	_esc_button = '\0';
+	_esc_key = '\0';
 	
 	//LED Pin setup
 	gpioSetMode(_flash_leds_pin, PI_OUTPUT);	
@@ -192,9 +211,12 @@ void FishTestCamera::_camera_off()
 	//Load camera to frame
 	_camera.read(_image);
 	
+	//Adds trackbars for camera settings
+	_add_trackbars();
+	
 	//Show camera for preview
-	cv::imshow("Preview camera", _image);
-	cv::waitKey(10);
+	cv::imshow(CANVAS_NAME, _image);
+	_esc_key = cv::waitKey(10);
 }
 
 //Records video, once flag has been turned off, save file
@@ -238,7 +260,7 @@ void FishTestCamera::_record_video()
 		//Store parameters for video
 		string file_name = _file_path_video + to_string(_video_count) + ".avi";
 		int codec = cv::VideoWriter::fourcc('M', 'J', 'P', 'G');
-		double fps = 12.0;
+		double fps = 30.0;
 		bool is_color = (_image.type() == CV_8UC3);
 		
 		//Open video stream and record
@@ -264,7 +286,7 @@ void FishTestCamera::_record_video()
 	}
 		
 	//Record video and show frames
-	while (_video_state == VIDEO_RECORD)
+	while (_video_state == VIDEO_RECORD && _esc_button != 'q' && _esc_key != 'q')
 	{
 		//Initialize timer for grabbing frame time
 		_frame_timer = cv::getTickCount();
@@ -284,15 +306,18 @@ void FishTestCamera::_record_video()
 		_led_state = !_led_state;
 		gpioWrite(_flash_leds_pin, _led_state);
 		
+		//Adds trackbars for camera settings
+		_add_trackbars();
+			
 		//Draw red rectangle around frame, also say recording
 		cv::rectangle(_image, cv::Point(1, 1), cv::Point(_image.size().width - 1, _image.size().height - 1), cv::Scalar(0, 0, 255), 3);
-		cv::putText(_image, "Recording", cv::Point(20, 20), cv::FONT_HERSHEY_DUPLEX, 0.75, cv::Scalar(0, 0, 255), 1);
+		cv::putText(_image, "Recording", cv::Point(20, 20), cv::FONT_HERSHEY_DUPLEX, 0.5, cv::Scalar(0, 0, 255), 1);
 		
 		//Show live while recording
-		cv::imshow("Preview camera", _image);
+		cv::imshow(CANVAS_NAME, _image);
 		
 		//Delay so LED flash can be fully on or off in the shot (not in transition)
-		cv::waitKey(30);		
+		_esc_key = cv::waitKey(_video_frame_period);		
 		
 		//Increment frame count, get time, write to log
 		_frame_count++;
@@ -304,9 +329,12 @@ void FishTestCamera::_record_video()
 	_camera.release();
 	
 	//Write remaining file info
+	_file_info_ss << "Exposure of camera: " << _exposure << "\n";
+	_file_info_ss << "Video frame period: " << _video_frame_period << "\n";
 	_file_info_ss << "File " << _video_count << ".avi successfully saved to " << _file_path_video << "\n";
 	_file_info_ss << "Length of video: " << (cv::getTickCount() - _video_timer) / cv::getTickFrequency() << "s\n";
 	_file_info_ss << "Date and time of video record: " << _get_time() << "\n\n";
+
 		
 	//Write to log file
 	_write_file(_file_info_ss.str(), _file_path_video + to_string(_video_count) + "_log.txt");
@@ -318,8 +346,8 @@ void FishTestCamera::_record_video()
 	_led_state = 0;
 	gpioWrite(_flash_leds_pin, _led_state);
 	
-			//Turn success LEDs on (calls thread)
-		_call_show_success();
+	//Turn success LEDs on (calls thread)
+	_call_show_success();
 	
 	//Reset camera state
 	_camera_state = CAMERA_OFF;	
@@ -347,7 +375,7 @@ void FishTestCamera::_record_pictures()
 		}
 		
 		//Open camera
-		_camera.open(0);
+		_init_cam();
 		
 		//Clear stringstream for taking in file data
 		_file_info_ss.str("");
@@ -425,6 +453,9 @@ void FishTestCamera::_record_pictures()
 		//Write time it between shots
 		_file_info_ss << "Time distance between camera shots: " <<  (cv::getTickCount() - _picture_timer) / cv::getTickFrequency() << "\n\n";
 		
+		//Write other camera parameters
+		_file_info_ss << "Exposure of camera: " << _exposure << "\n";
+		
 		//Write it to display, and save it to file as well
 		std::cout << _file_info_ss.str();
 		_write_file(_file_info_ss.str(), curr_file_path + to_string(_picture_count) + "_log.txt");
@@ -466,9 +497,178 @@ void FishTestCamera::_init_cam()
 	//Set video stream width/height
 	_camera.set(cv::CAP_PROP_FRAME_WIDTH, _camera_size.width);
 	_camera.set(cv::CAP_PROP_FRAME_HEIGHT, _camera_size.height);
+	
 }
 
+//Adds trackbars for certain parameters to be adjusted
+void FishTestCamera::_add_trackbars()
+{
+	//Initial variables for trackbar window
+	cv::Point update_window_pos;
+	int height;	
+	string visibility_button_str;
+	
+	//Adjust update window whether it should be hidden or not
+	if (_show_cvui == true) 
+	{
+		height = _image.size().height;
+		visibility_button_str = "Hide settings";
+	}
+	else
+	{
+		height = 50;
+		visibility_button_str = "Show settings";
+	}
+	
+	//Window setting x
+	update_window_pos.x = _image.size().width - 200;
+	
+	//Initiate window
+	cvui::window(_image, update_window_pos.x, update_window_pos.y, 200, height, "Settings and functions");
+	
+	//Show/hide button position
+	update_window_pos.y += 25;
+	
+	//Show/hide button implementation
+	if (cvui::button(_image, update_window_pos.x+50, update_window_pos.y, 100, 25, visibility_button_str)) 
+	{
+		//Change whether trackbar is shown or not
+		_show_cvui = !_show_cvui;
+		
+		//Change height now so that we don't have the other buttons accidentally selected
+		height = _image.size().height;
+	}	
+	
+	//If "show" is selected, write rest of cvui
+	if (_show_cvui) 
+	{
+		//Move position of update settings position down
+		update_window_pos.y += 45;
+	
+		//Change exposure of camera
+		cvui::trackbar(_image, update_window_pos.x + 10, update_window_pos.y, 180, &_exposure, EXPOSURE_MIN, EXPOSURE_MAX);
+		cvui::text(_image, update_window_pos.x + 65, update_window_pos.y, "Exposure");
+		
+		//Move position of update settings position down
+		update_window_pos.y += 70;
+		
+		//Change exposure of camera
+		cvui::trackbar(_image, update_window_pos.x + 10, update_window_pos.y, 180, &_brightness, BRIGHTNESS_MIN, BRIGHTNESS_MAX);
+		cvui::text(_image, update_window_pos.x + 65, update_window_pos.y, "Brightness");
+		
+		//Move position of update settings position down
+		update_window_pos.y += 70;
+		
+		//Change exposure of camera
+		cvui::trackbar(_image, update_window_pos.x + 10, update_window_pos.y, 180, &_contrast, CONTRAST_MIN, CONTRAST_MAX);
+		cvui::text(_image, update_window_pos.x + 65, update_window_pos.y, "Contrast");
+		
+		//Move position of update settings position down
+		update_window_pos.y += 70;
+		
+		//Change exposure of camera
+		cvui::trackbar(_image, update_window_pos.x + 10, update_window_pos.y, 180, &_saturation, SATURATION_MIN, SATURATION_MAX);
+		cvui::text(_image, update_window_pos.x + 65, update_window_pos.y, "Saturation");
+		
+		//Move position of update settings position down
+		update_window_pos.y += 70;
+		
+		//Change framerate of video
+		cvui::trackbar(_image, update_window_pos.x + 10, update_window_pos.y, 180, &_video_frame_period, FRAME_PERIOD_MIN, FRAME_PERIOD_MAX);
+		cvui::text(_image, update_window_pos.x + 60, update_window_pos.y, "Frame period");		
+		
+		//Put in buttons for picture and video
+		update_window_pos.y = height - 50;
+	
+		//Take picture button
+		if (cvui::button(_image, update_window_pos.x, update_window_pos.y, 100, 25, "Picture")) 
+		{
+			//Essentially, this is like pressing button 1
+			set_button_1();
+		}	
+		
+		//Take picture button
+		if (cvui::button(_image, update_window_pos.x + 100, update_window_pos.y, 100, 25, "Video")) 
+		{
+			//Essentially, this is like pressing button 2
+			set_button_2();
+		}
 
+		//Put in buttons for picture and video
+		update_window_pos.y = height - 75;
+		
+		//Default values
+		if (cvui::button(_image, update_window_pos.x+100, update_window_pos.y, 100, 25, "Default Values")) 
+		{
+			//Default framerate for video
+			_video_frame_period = FRAME_PERIOD_DEFAULT;
+
+			//Initialize camera and cvui parameters
+			_exposure = EXPOSURE_DEFAULT;
+			_brightness = BRIGHTNESS_DEFAULT;
+			_contrast = CONTRAST_DEFAULT;
+			_saturation = SATURATION_DEFAULT;
+		}		
+	}	
+	
+	//Add quit window
+	if (cvui::button(_image, _image.size().width - 75, _image.size().height - 25, 75, 25, "Quit"))
+	{
+		_esc_button = 'q';
+	}
+	
+	//Update all trackbars
+	cvui::update();
+	
+	//Update camera settings afterwards
+	_update_camera_settings();
+}
+
+//Updates camera settings based on trackbar input
+void FishTestCamera::_update_camera_settings()
+{
+	//Only do this if exposure has been changed
+	if (_exposure_prev != _exposure) 
+	{
+		_exposure_prev = _exposure;
+
+		//Update exposure
+		string exposure_command = "v4l2-ctl --device /dev/video0 -c exposure_time_absolute=" + to_string(_exposure);
+		system(exposure_command.c_str());		
+	}
+	
+	//Only do this if brightness has been changed
+	if (_brightness_prev != _brightness) 
+	{
+		_brightness_prev = _brightness;
+
+		//Update exposure
+		string brightness_command = "v4l2-ctl --device /dev/video0 -c brightness=" + to_string(_brightness);
+		system(brightness_command.c_str());		
+	}
+	
+	//Only do this if contrast has been changed
+	if (_contrast_prev != _contrast) 
+	{
+		_contrast_prev = _contrast;
+
+		//Update exposure
+		string contrast_command = "v4l2-ctl --device /dev/video0 -c contrast=" + to_string(_contrast);
+		system(contrast_command.c_str());		
+	}
+	
+	//Only do this if exposure has been changed
+	if (_saturation_prev != _saturation) 
+	{
+		_saturation_prev = _saturation;
+
+		//Update exposure
+		string saturation_command = "v4l2-ctl --device /dev/video0 -c saturation=" + to_string(_saturation);
+		system(saturation_command.c_str());		
+	}
+}
+
+//Get date and time in yyyy_mm_dd_hxxmxxsxx
 string FishTestCamera::_get_time()
 {		
 	//Create unique timestamp for folder

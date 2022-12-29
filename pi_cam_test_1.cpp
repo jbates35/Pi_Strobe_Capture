@@ -13,6 +13,12 @@
 
 #include <opencv2/opencv.hpp>
 
+// Add simple GUI elements
+#define CVUI_DISABLE_COMPILATION_NOTICES
+#define CVUI_IMPLEMENTATION
+
+#include "cvui.h"
+
 #include "FishTestCamera.h"
 
 #define BUTTON_1_PIN	19 // pin for button
@@ -26,6 +32,7 @@
 #define DEBOUNCE_INTERVAL_VID_S		1		//seconds
 #define DEBOUNCE_INTERVAL_VID_US	250000	// microseconds
 
+#define ISR_TIMEOUT		100000 // microseconds
 
 //Holds camera object for taking picture, saving to file, doing some processing
 FishTestCamera cam(FLASH_LEDS_PIN, VIDEO_LED_PIN, SUCCESS_LED_PIN, BUTTON_1_PIN, BUTTON_2_PIN);
@@ -58,6 +65,12 @@ int main()
 	while (1)
 	{
 		cam.run();
+		
+		//Quit program if q is pressed
+		if (cam.esc_key() == 'q' || cam.esc_button() == 'q')
+		{
+			break;
+		}
 	}
 }
 

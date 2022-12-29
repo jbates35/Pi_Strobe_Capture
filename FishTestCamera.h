@@ -12,15 +12,33 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgcodecs.hpp>
 
+#include "cvui.h"
+
 #include <pigpio.h>
 
 using namespace std;
 
-#define ISR_TIMEOUT		100000 // microseconds
+#define CANVAS_NAME		"Preview Camera"
 
-#define VID_BUTTON_INTERVAL 1 // Amount of time to hold video toggle button
+#define EXPOSURE_DEFAULT	100		//Default exposure of camera
+#define EXPOSURE_MIN		20		//Min exposure of camera
+#define EXPOSURE_MAX		250		//Max exposure of camera
 
-#define STROBE_INT 0.05  //Length of interval between LEDs turning on, and off (in s)
+#define BRIGHTNESS_DEFAULT	50		//Default brightness of camera
+#define BRIGHTNESS_MIN		0		//Min brightness of camera
+#define BRIGHTNESS_MAX		100		//Max brightness of camera
+
+#define CONTRAST_DEFAULT	50		//Default contrast of camera
+#define CONTRAST_MIN		0		//Min contrast of camera
+#define CONTRAST_MAX		100		//Max contrast of camera
+
+#define SATURATION_DEFAULT	50		//Default contrast of camera
+#define SATURATION_MIN		0		//Min saturation of camera
+#define SATURATION_MAX		100		//Max saturation of camera
+
+#define FRAME_PERIOD_DEFAULT 30		//Default frame rate
+#define FRAME_PERIOD_MIN	5		//Minimum framerate for video
+#define FRAME_PERIOD_MAX	60		//Max framerate for video
 
 //State of class, either taking a picture or running a video
 enum
@@ -65,14 +83,30 @@ public:
 	void run();
 	
 	/**
-	 ** Set button 1 to on
+	 ** @brief Set button 1 to on
 	 ***/
 	void set_button_1();
 	
 	/**
-	 ** Set button 2 to on
+	 ** @brief Set button 2 to on
 	 ***/
 	void set_button_2();
+	
+	/**
+	 ** @brief Getter for waitKey variable
+	 ***/
+	char esc_key()
+	{
+		return _esc_key;
+	}
+	
+	/**
+	 ** @brief Getter for quit button
+	 ***/
+	char esc_button()
+	{
+		return _esc_button;
+	}	
 	
 	
 private:
@@ -80,13 +114,28 @@ private:
 	//OpenCV Video stream
 	cv::VideoCapture _camera;
 	cv::Size _camera_size;
-	
+		
 	//OpenCV mat for video or pic
 	cv::Mat _image;
 	
 	//OpenCV video object for recording
 	cv::VideoWriter _video;
-		
+	
+	//CVUI parameters
+	bool _show_cvui;
+	
+	//Camera parameters
+	int _exposure, _exposure_prev;
+	int _brightness, _brightness_prev;
+	int _contrast, _contrast_prev;
+	int _saturation, _saturation_prev;
+	
+	//For assigning waitKey to
+	char _esc_key;
+	
+	//For assigning quit button to
+	char _esc_button;
+	
 	//Pins for various LEDs
 	int _flash_leds_pin;
 	int _video_led_pin;
@@ -131,6 +180,9 @@ private:
 	//Need video state machine for whether it's starting, recording or if it's done
 	int _video_state;
 	
+	//Desired framerate for videos, changed by slider
+	int _video_frame_period;
+	
 	//Frame count and timer
 	int _frame_count;
 	double _frame_timer;
@@ -154,6 +206,12 @@ private:
 	
 	//Makes sure camera is initialized/turned on, sets width/height
 	void _init_cam();
+	
+	//Adds trackbars for certain parameters to be adjusted
+	void _add_trackbars();
+	
+	//Updates camera settings based on trackbar input
+	void _update_camera_settings();
 	
 	//Fills the time buffer with current time
 	string _get_time();
