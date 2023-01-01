@@ -21,12 +21,12 @@
 
 #include "FishTestCamera.h"
 
-#define BUTTON_1_PIN	19 // pin for button
-#define BUTTON_2_PIN	13 // pin for button
+#define BUTTON_1_PIN	27 // pin for button
+#define BUTTON_2_PIN	25 // pin for button
 
-#define FLASH_LEDS_PIN	26 // pin for flashing led
-#define VIDEO_LED_PIN	20 // pin for flashing led
-#define SUCCESS_LED_PIN	21 // pin for flashing led
+#define FLASH_LEDS_PIN	5 // pin for flashing led
+#define VIDEO_LED_PIN	24 // pin for flashing led
+#define SUCCESS_LED_PIN	22 // pin for flashing led
 	
 #define DEBOUNCE_INTERVAL			10000	// microseconds
 #define DEBOUNCE_INTERVAL_VID_S		1		//seconds
@@ -50,7 +50,6 @@ void button_2_isr(int gpio, int level, uint32_t tick);
 //////////FUNCTION DEFINITIONS///////////
 int main()
 {
-
 	//Initialize variables, pins, etc.
 	if (cam.init() < 0)
 	{

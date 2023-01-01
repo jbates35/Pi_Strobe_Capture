@@ -106,7 +106,12 @@ int FishTestCamera::init()
 	_brightness = BRIGHTNESS_DEFAULT;
 	_contrast = CONTRAST_DEFAULT;
 	_saturation = SATURATION_DEFAULT;
+	_red_balance = RED_DEFAULT;
+	_blue_balance = BLUE_DEFAULT;
 	_show_cvui = false;
+	
+	//LED mode when video is playing
+	_video_led_mode = LED_STROBE;
 	
 	//Initialize LED state
 	_led_state = false;
@@ -302,10 +307,26 @@ void FishTestCamera::_record_video()
 		//Capture frame
 		_video.write(_image);	
 		
-		//Toggle led state and strobe lights
+		//Toggle led state for strobing
 		_led_state = !_led_state;
-		gpioWrite(_flash_leds_pin, _led_state);
-		
+	
+		//Strobe lights, or just keep them on/off depending on desired video mode
+		switch (_video_led_mode)
+		{
+		case LED_OFF:
+			gpioWrite(_flash_leds_pin, 0);
+			break;
+		case LED_STROBE:
+			gpioWrite(_flash_leds_pin, _led_state);
+			break;
+		case LED_ON:
+			gpioWrite(_flash_leds_pin, 1);
+			break;
+		default:
+			gpioWrite(_flash_leds_pin, _led_state);
+			break;
+		}
+			
 		//Adds trackbars for camera settings
 		_add_trackbars();
 			
@@ -333,12 +354,14 @@ void FishTestCamera::_record_video()
 	_file_info_ss << "Brightness of camera: " << _brightness << "\n";
 	_file_info_ss << "Contrast of camera: " << _contrast << "\n";
 	_file_info_ss << "Saturation of camera: " << _saturation << "\n";
+	_file_info_ss << "Red balance of camera: " << _red_balance << "\n";
+	_file_info_ss << "Blue balance of camera: " << _blue_balance << "\n";
 	_file_info_ss << "Video frame period: " << _video_frame_period << "\n";
+	_file_info_ss << "LED Strobe mode (0 for off, 1 for strobe, 2 for on): " << _video_led_mode << "\n";
 	_file_info_ss << "File " << _video_count << ".avi successfully saved to " << _file_path_video << "\n";
 	_file_info_ss << "Length of video: " << (cv::getTickCount() - _video_timer) / cv::getTickFrequency() << "s\n";
 	_file_info_ss << "Date and time of video record: " << _get_time() << "\n\n";
 
-		
 	//Write to log file
 	_write_file(_file_info_ss.str(), _file_path_video + to_string(_video_count) + "_log.txt");
 	
@@ -461,6 +484,8 @@ void FishTestCamera::_record_pictures()
 		_file_info_ss << "Brightness of camera: " << _brightness << "\n";
 		_file_info_ss << "Contrast of camera: " << _contrast << "\n";
 		_file_info_ss << "Saturation of camera: " << _saturation << "\n";
+		_file_info_ss << "Red balance of camera: " << _red_balance << "\n";
+		_file_info_ss << "Blue balance of camera: " << _blue_balance << "\n";
 		
 		//Write it to display, and save it to file as well
 		std::cout << _file_info_ss.str();
@@ -556,52 +581,64 @@ void FishTestCamera::_add_trackbars()
 		cvui::text(_image, update_window_pos.x + 65, update_window_pos.y, "Exposure");
 		
 		//Move position of update settings position down
-		update_window_pos.y += 70;
+		update_window_pos.y += TRACKBAR_VERTICAL_SPACE;
 		
 		//Change exposure of camera
 		cvui::trackbar(_image, update_window_pos.x + 10, update_window_pos.y, 180, &_brightness, BRIGHTNESS_MIN, BRIGHTNESS_MAX);
 		cvui::text(_image, update_window_pos.x + 65, update_window_pos.y, "Brightness");
 		
 		//Move position of update settings position down
-		update_window_pos.y += 70;
+		update_window_pos.y += TRACKBAR_VERTICAL_SPACE;
 		
 		//Change exposure of camera
 		cvui::trackbar(_image, update_window_pos.x + 10, update_window_pos.y, 180, &_contrast, CONTRAST_MIN, CONTRAST_MAX);
 		cvui::text(_image, update_window_pos.x + 65, update_window_pos.y, "Contrast");
 		
 		//Move position of update settings position down
-		update_window_pos.y += 70;
+		update_window_pos.y += TRACKBAR_VERTICAL_SPACE;
 		
 		//Change exposure of camera
 		cvui::trackbar(_image, update_window_pos.x + 10, update_window_pos.y, 180, &_saturation, SATURATION_MIN, SATURATION_MAX);
 		cvui::text(_image, update_window_pos.x + 65, update_window_pos.y, "Saturation");
 		
 		//Move position of update settings position down
-		update_window_pos.y += 70;
+		update_window_pos.y += TRACKBAR_VERTICAL_SPACE;
 		
 		//Change framerate of video
 		cvui::trackbar(_image, update_window_pos.x + 10, update_window_pos.y, 180, &_video_frame_period, FRAME_PERIOD_MIN, FRAME_PERIOD_MAX);
 		cvui::text(_image, update_window_pos.x + 60, update_window_pos.y, "Frame period");		
-		
-		//Put in buttons for picture and video
-		update_window_pos.y = height - 50;
-	
-		//Take picture button
-		if (cvui::button(_image, update_window_pos.x, update_window_pos.y, 100, 25, "Picture")) 
-		{
-			//Essentially, this is like pressing button 1
-			set_button_1();
-		}	
-		
-		//Take picture button
-		if (cvui::button(_image, update_window_pos.x + 100, update_window_pos.y, 100, 25, "Video")) 
-		{
-			//Essentially, this is like pressing button 2
-			set_button_2();
-		}
 
 		//Put in buttons for picture and video
 		update_window_pos.y = height - 75;
+			
+		//String for LED Video strobe button
+		string led_mode_string;		
+		switch (_video_led_mode)
+		{
+		case LED_OFF:
+			led_mode_string = "LED is off";
+			break;
+		case LED_STROBE:
+			led_mode_string = "LED is strobed";
+			break;
+		case LED_ON:
+			led_mode_string = "LED is on";
+			break;
+		default:
+			break;
+		}
+	
+		//LED Video Strobe mode
+		if (cvui::button(_image, update_window_pos.x, update_window_pos.y, 100, 25, led_mode_string)) 
+		{
+			_video_led_mode++;
+			
+			//Roll over if video led mode variable has exceeded max
+			if (_video_led_mode >= 3)
+			{
+				_video_led_mode = 0;
+			}
+		}
 		
 		//Default values
 		if (cvui::button(_image, update_window_pos.x+100, update_window_pos.y, 100, 25, "Default Values")) 
@@ -614,8 +651,27 @@ void FishTestCamera::_add_trackbars()
 			_brightness = BRIGHTNESS_DEFAULT;
 			_contrast = CONTRAST_DEFAULT;
 			_saturation = SATURATION_DEFAULT;
+			_red_balance = RED_DEFAULT;
+			_blue_balance = BLUE_DEFAULT;
 		}		
 	}	
+		
+	//Put in buttons for picture and video
+	update_window_pos.y = height - 50;
+	
+	//Take picture button
+	if (cvui::button(_image, update_window_pos.x, update_window_pos.y, 100, 25, "Picture")) 
+	{
+		//Essentially, this is like pressing button 1
+		set_button_1();
+	}	
+		
+	//Take picture button
+	if (cvui::button(_image, update_window_pos.x + 100, update_window_pos.y, 100, 25, "Video")) 
+	{
+		//Essentially, this is like pressing button 2
+		set_button_2();
+	}
 	
 	//Add quit window
 	if (cvui::button(_image, _image.size().width - 75, _image.size().height - 25, 75, 25, "Quit"))
@@ -648,7 +704,7 @@ void FishTestCamera::_update_camera_settings()
 	{
 		_brightness_prev = _brightness;
 
-		//Update exposure
+		//Update brightness
 		string brightness_command = "v4l2-ctl --device /dev/video0 -c brightness=" + to_string(_brightness);
 		system(brightness_command.c_str());		
 	}
@@ -658,19 +714,39 @@ void FishTestCamera::_update_camera_settings()
 	{
 		_contrast_prev = _contrast;
 
-		//Update exposure
+		//Update contrast
 		string contrast_command = "v4l2-ctl --device /dev/video0 -c contrast=" + to_string(_contrast);
 		system(contrast_command.c_str());		
 	}
 	
-	//Only do this if exposure has been changed
+	//Only do this if saturation has been changed
 	if (_saturation_prev != _saturation) 
 	{
 		_saturation_prev = _saturation;
 
-		//Update exposure
+		//Update saturation
 		string saturation_command = "v4l2-ctl --device /dev/video0 -c saturation=" + to_string(_saturation);
 		system(saturation_command.c_str());		
+	}
+	
+	//Only do this if red balance has been changed
+	if (_red_balance_prev != _red_balance) 
+	{
+		_red_balance_prev = _red_balance;
+
+		//Update red balance
+		string red_balance_command = "v4l2-ctl --device /dev/video0 -c red_balance=" + to_string(_red_balance);
+		system(red_balance_command.c_str());		
+	}
+	
+	//Only do this if blue balance has been changed
+	if (_blue_balance_prev != _blue_balance) 
+	{
+		_blue_balance_prev = _blue_balance;
+
+		//Update blue balance
+		string blue_balance_command = "v4l2-ctl --device /dev/video0 -c blue_balance=" + to_string(_blue_balance);
+		system(blue_balance_command.c_str());		
 	}
 }
 

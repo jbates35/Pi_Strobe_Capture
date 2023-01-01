@@ -1,4 +1,4 @@
-#pragma once
+#pragma Rnce
 
 #include <thread>
 #include <iostream>
@@ -36,9 +36,19 @@ using namespace std;
 #define SATURATION_MIN		0		//Min saturation of camera
 #define SATURATION_MAX		100		//Max saturation of camera
 
+#define RED_DEFAULT			1000	//Default value for red balance of camera
+#define RED_MIN				1		//Min value for red balance of camera
+#define RED_MAX				7999	//Max value for red balance of camera
+
+#define BLUE_DEFAULT		1000	//Default value for blue balance of camera
+#define BLUE_MIN			1		//min value for blue balance of camera
+#define BLUE_MAX			7999	//Max value for blue balance of camera
+
 #define FRAME_PERIOD_DEFAULT 30		//Default frame rate
 #define FRAME_PERIOD_MIN	5		//Minimum framerate for video
 #define FRAME_PERIOD_MAX	60		//Max framerate for video
+
+#define TRACKBAR_VERTICAL_SPACE 70	//Distance between trackbars in cvui menu bar
 
 //State of class, either taking a picture or running a video
 enum
@@ -52,6 +62,13 @@ enum
 {
 	VIDEO_RECORD,
 	VIDEO_DONE
+};
+
+enum
+{
+	LED_OFF,
+	LED_STROBE,
+	LED_ON
 };
 
 class FishTestCamera
@@ -129,6 +146,8 @@ private:
 	int _brightness, _brightness_prev;
 	int _contrast, _contrast_prev;
 	int _saturation, _saturation_prev;
+	int _red_balance, _red_balance_prev;
+	int _blue_balance, _blue_balance_prev;
 	
 	//For assigning waitKey to
 	char _esc_key;
@@ -182,6 +201,9 @@ private:
 	
 	//Desired framerate for videos, changed by slider
 	int _video_frame_period;
+	
+	//For if LEDs are off, on, or they strobe when taking video
+	int _video_led_mode;
 	
 	//Frame count and timer
 	int _frame_count;
